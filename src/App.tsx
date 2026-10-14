@@ -163,7 +163,17 @@ const HOME: { [name: string]: Entry } = {
 
 const PASSPHRASES = ["chaos", "chaøs"]
 
-type Line = { kind: "in" | "out" | "ok" | "err"; text: string }
+// `dirs` names the folders in an ls listing, so they can be coloured the way Kali does.
+type Line = { kind: "in" | "out" | "ok" | "err"; text: string; dirs?: string[] }
+
+const CONTACT = `Email     ${links.email}\nLinkedIn  ${links.linkedinLabel}\nGitHub    github.com/NunoGoncalves06\n\nYou got in. Write to me, I'd like to hear how long it took.`
+
+// Fixed, made-up timestamps so ls -l looks real and stays the same on every visit.
+const STAMP: Record<string, string> = {
+  ".": "Oct 14 10:02", "..": "Sep  2 18:40", "about.txt": "Oct  3 21:15", projects: "Oct 12 16:48", certs: "Aug  2 11:30",
+  "contact.txt": "Oct 14 10:02", ".notes": "Oct 14 09:57", "ccna3-network.txt": "Feb 13 19:22", "wakecast.txt": "Sep 30 14:36",
+  "aisafe.txt": "Jun 18 23:05", "ccna.txt": "Aug  2 11:30", "ceh-v13.txt": "Jul 21 17:10", "aws.txt": "Jan 27 12:44",
+}
 
 function Terminal({ addFlag }: { addFlag: (f: string) => "new" | "again" | "wrong"; }) {
   const [cwd, setCwd] = useState<string[]>([])
@@ -197,11 +207,56 @@ function Terminal({ addFlag }: { addFlag: (f: string) => "new" | "again" | "wron
       case "":
         break
       case "help":
-        say("ls [-a]          list files (-a shows hidden ones)\ncd <folder>      open a folder (cd .. goes back)\ncat <file>       read a file\nunlock <word>    unlock contact.txt\nflag <flag>      submit a flag you found on this site\nwhoami, pwd, clear")
+        say("ls [-l] [-a]     list files (-a shows hidden ones, -l shows details)\ncd <folder>      open a folder (cd .. goes back)\ncat <file>       read a file\nunlock <word>    unlock contact.txt\nflag <flag>      submit a flag you found on this site\nwhoami, pwd, clear")
         break
       case "ls": {
-        const names = Object.keys(dir).filter((n) => args.includes("-a") || !n.startsWith("."))
-        say(names.map((n) => (typeof dir[n] === "string" ? n : n + "/")).join("   "))
+        // Behaves like GNU ls for the options people try: -a, -l, -1, -h and any mix (-la, -al, -lah).
+        const flags = args.filter((a) => a.startsWith("-") && a.length > 1).map((a) => a.slice(1)).join("")
+        const bad = [...flags].find((c) => !"alh1".includes(c))
+        if (bad) {
+          say(`ls: invalid option -- '${bad}'\nTry 'ls --help' for more information.`, "err")
+          break
+        }
+        const target = args.find((a) => !a.startsWith("-"))?.replace(/\/$/, "")
+        let folder = dir
+        let names: string[]
+        if (target && target !== ".") {
+          const entry = target === ".." ? (cwd.length ? HOME : undefined) : dir[target]
+          if (entry === undefined) {
+            say(`ls: cannot access '${target}': No such file or directory`, "err")
+            break
+          }
+          if (typeof entry === "string") names = [target]
+          else {
+            folder = entry
+            names = Object.keys(entry)
+          }
+        } else names = Object.keys(folder)
+        const single = names.length === 1 && typeof folder[names[0]] === "string" && target === names[0]
+        names = names.filter((n) => flags.includes("a") || single || !n.startsWith("."))
+        names.sort((a, b) => a.replace(/^\./, "").localeCompare(b.replace(/^\./, "")))
+        if (flags.includes("a") && !single) names = [".", "..", ...names]
+        const isDir = (n: string) => n === "." || n === ".." || typeof folder[n] !== "string"
+        const dirs = names.filter(isDir)
+
+        if (!flags.includes("l")) {
+          say(names.join(flags.includes("1") ? "\n" : "  "))
+          out[out.length - 1].dirs = dirs
+          break
+        }
+        const rows = names.map((n) => {
+          const locked = folder === HOME && n === "contact.txt" && !unlocked
+          const size = isDir(n) ? 4096 : new TextEncoder().encode(n === "contact.txt" ? CONTACT : (folder[n] as string)).length
+          const mode = isDir(n) ? "drwxr-xr-x" : locked ? "-r--------" : "-rw-r--r--"
+          const owner = locked ? "root root" : "nuno nuno"
+          const shown = flags.includes("h") && size >= 1024 ? (size / 1024).toFixed(1).replace(/\.0$/, "") + "K" : String(size)
+          return { n, mode, links: isDir(n) ? 2 : 1, owner, shown }
+        })
+        const width = Math.max(...rows.map((r) => r.shown.length))
+        say(
+          [...(single ? [] : [`total ${names.length * 4}`]), ...rows.map((r) => `${r.mode} ${r.links} ${r.owner} ${r.shown.padStart(width)} ${STAMP[r.n] ?? "Oct 14 10:02"} ${r.n}`)].join("\n"),
+        )
+        out[out.length - 1].dirs = dirs
         break
       }
       case "cd":
@@ -213,7 +268,7 @@ function Terminal({ addFlag }: { addFlag: (f: string) => "new" | "again" | "wron
       case "cat":
         if (!arg) say("cat: which file? Try ls first.", "err")
         else if (cwd.length === 0 && arg === "contact.txt") {
-          if (unlocked) say(`Email     ${links.email}\nLinkedIn  ${links.linkedinLabel}\nGitHub    github.com/NunoGoncalves06\n\nYou got in. Write to me, I'd like to hear how long it took.`, "ok")
+          if (unlocked) say(CONTACT, "ok")
           else say("cat: contact.txt: permission denied. Try unlock <passphrase>.", "err")
         } else if (typeof dir[arg] === "string") say(dir[arg] as string)
         else if (dir[arg]) say(`cat: ${arg}: is a folder. Use cd ${arg}`, "err")
@@ -269,7 +324,9 @@ function Terminal({ addFlag }: { addFlag: (f: string) => "new" | "again" | "wron
             key={i}
             className={`whitespace-pre-wrap break-words ${l.kind === "in" ? "text-ink" : l.kind === "ok" ? "text-amber" : l.kind === "err" ? "text-red" : "text-body"}`}
           >
-            {l.text}
+            {l.dirs?.length
+              ? l.text.split(/(\s+)/).map((part, j) => (l.dirs!.includes(part) ? <span key={j} className="font-semibold text-[#5c9cff]">{part}</span> : part))
+              : l.text}
           </pre>
         ))}
       </div>
