@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
 import { ArrowUpRight, EnvelopeSimple, GithubLogo, LinkedinLogo, SealCheck } from "@phosphor-icons/react"
 
@@ -41,6 +41,13 @@ const nav = [
 ] as const
 
 export default function App() {
+  const flags = useFlags()
+
+  useEffect(() => {
+    console.log("%cflag 2 of 3: flag{console_curious}", "color:#ff2a4f;font:600 14px monospace")
+    console.log("Submit it in the terminal at the top of the page: flag <value>")
+  }, [])
+
   return (
     <div className="dark min-h-[100dvh] bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-line/70 bg-background/85 backdrop-blur">
@@ -64,7 +71,7 @@ export default function App() {
       </header>
 
       <main id="top">
-        <Hero />
+        <Hero addFlag={flags.add} />
         <Results />
         <Certifications />
         <Projects />
@@ -73,8 +80,13 @@ export default function App() {
         <Contact />
       </main>
 
-      <footer className="mx-auto max-w-6xl px-4 py-10 text-xs text-faint md:px-8">
-        Nuno Gonçalves, Porto. Built with React, Tailwind and Motion.
+      <footer className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-10 text-xs text-faint md:flex-row md:justify-between md:px-8">
+        <span>Nuno Gonçalves, Porto. Built with React, Tailwind and Motion.</span>
+        <span aria-live="polite">
+          {flags.found.length === FLAGS.length
+            ? "All 3 flags found. Thanks for digging around; email me and say hi."
+            : `Flags found: ${flags.found.length} of ${FLAGS.length}. They are hidden on this site; submit them in the terminal with flag <value>.`}
+        </span>
       </footer>
     </div>
   )
@@ -90,15 +102,21 @@ function Section({ id, title, intro, children }: { id: string; title: string; in
   )
 }
 
-function Hero() {
+function Hero({ addFlag }: { addFlag: (f: string) => "new" | "again" | "wrong" }) {
   return (
     <section className="relative overflow-hidden border-b border-line">
       <div className="scanlines pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative mx-auto grid max-w-6xl gap-12 px-4 pb-20 pt-12 md:px-8 lg:grid-cols-[1.1fr_1fr] lg:items-center lg:pt-16">
         <div className="min-w-0">
-          <pre aria-hidden className="mb-6 font-mono text-[5px] leading-[1.05] text-red sm:text-[6px]">
-            {DRAGON}
-          </pre>
+          {/* Flag 3 of 3 shows up after resting the pointer on the dragon (or focusing it) for a moment. */}
+          <div tabIndex={0} aria-label="Kali dragon" className="group relative mb-6 w-fit outline-none">
+            <pre aria-hidden className="font-mono text-[5px] leading-[1.05] text-red sm:text-[6px]">
+              {DRAGON}
+            </pre>
+            <span className="pointer-events-none absolute left-full top-1/2 ml-3 whitespace-nowrap font-mono text-[11px] text-red opacity-0 transition-opacity delay-0 group-hover:opacity-100 group-hover:delay-700 group-focus:opacity-100">
+              flag 3 of 3: flag{"{here_be_dragons}"}
+            </span>
+          </div>
           <p className="text-body">Nuno Gonçalves, Informatics Engineering at ISEP, Porto</p>
           <h1
             className="glitch mt-3 font-display text-6xl font-extrabold uppercase leading-[0.9] text-ink sm:text-7xl md:text-8xl"
@@ -116,92 +134,207 @@ function Hero() {
             </Button>
           </div>
         </div>
-        <PatchDemo />
+        <Terminal addFlag={addFlag} />
       </div>
     </section>
   )
 }
 
-// A tiny password check, as a disassembler would show it. Patching one byte flips the
-// branch: the program then lets in every wrong password. This is what the work looks like.
-const LISTING = [
-  ["00401149", "e8 e2 fe ff ff", "call", "strcmp", ""],
-  ["0040114e", "85 c0", "test", "eax, eax", "; same?"],
-  ["00401150", "75 07", "jne", "0x401159", "; if not: deny"],
-  ["00401152", "b8 01 00 00 00", "mov", "eax, 1", "; granted"],
-  ["00401157", "eb 05", "jmp", "0x40115e", ""],
-  ["00401159", "b8 00 00 00 00", "mov", "eax, 0", "; denied"],
-  ["0040115e", "c3", "ret", "", ""],
-] as const
+// The terminal escape room: a pretend home folder to explore with a few real commands.
+// One file is locked; the passphrase hint sits in a hidden file. Nothing here touches a real system.
+type Entry = string | { [name: string]: Entry }
 
-const SECRET = "ccna-2026"
+const HOME: { [name: string]: Entry } = {
+  "about.txt":
+    "Nuno Gonçalves. Informatics Engineering student at ISEP in Porto, on Erasmus at Aarhus University this autumn.\nI play CTFs with CHAØS and I'm CCNA certified. I like finding how things break, then explaining the fix.",
+  projects: {
+    "ccna3-network.txt": "A three-site company network on real Cisco equipment: VLANs, HSRP, OSPF, IPsec VPN tunnels, NAT and IP telephony.\nTeam project, maximum score.",
+    "wakecast.txt": "An Android alarm that reads you a morning briefing when you dismiss it.\nCode: github.com/NunoGoncalves06/Wakecast",
+    "aisafe.txt": "A flight control prototype: a flight-plan language parsed with ANTLR and a simulation engine in C.",
+  },
+  certs: {
+    "ccna.txt": "Cisco Certified Network Associate, August 2026. Verified on Credly.",
+    "ceh-v13.txt": "Certified Ethical Hacker v13: training completed at ISEP Academy, 2026.",
+    "aws.txt": "AWS Cloud Practitioner: training completed at ISEP Academy.",
+  },
+  "contact.txt": "",
+  ".notes": "note to self: the passphrase for contact.txt is the name of my CTF team.\nit's somewhere on this page.",
+}
 
-function PatchDemo() {
-  const [patched, setPatched] = useState(false)
-  const [guess, setGuess] = useState("hunter2")
-  const [runs, setRuns] = useState<{ guess: string; ok: boolean; patched: boolean }[]>([])
+const PASSPHRASES = ["chaos", "chaøs"]
 
-  const run = () => {
-    const equal = guess === SECRET
-    // jne jumps to "denied" when the strings differ; the patched je jumps there when they match.
-    const ok = patched ? !equal : equal
-    setRuns((r) => [...r.slice(-2), { guess, ok, patched }])
+type Line = { kind: "in" | "out" | "ok" | "err"; text: string }
+
+function Terminal({ addFlag }: { addFlag: (f: string) => "new" | "again" | "wrong"; }) {
+  const [cwd, setCwd] = useState<string[]>([])
+  const [unlocked, setUnlocked] = useState(false)
+  const [input, setInput] = useState("")
+  const [history, setHistory] = useState<string[]>([])
+  const [back, setBack] = useState(0)
+  const [lines, setLines] = useState<Line[]>([
+    { kind: "out", text: "Welcome to my machine. One file in here is locked: contact.txt." },
+    { kind: "out", text: "Type help to see what you can do." },
+  ])
+  const screen = useRef<HTMLDivElement>(null)
+  const field = useRef<HTMLInputElement>(null)
+
+  // Scroll inside the terminal only; scrolling the page here would yank visitors down on load.
+  useEffect(() => {
+    if (screen.current) screen.current.scrollTop = screen.current.scrollHeight
+  }, [lines])
+
+  const prompt = `nuno@kali:~${cwd.length ? "/" + cwd.join("/") : ""}$`
+  const here = () => cwd.reduce<Entry>((dir, name) => (dir as Record<string, Entry>)[name], HOME) as Record<string, Entry>
+
+  const run = (raw: string) => {
+    const [cmd = "", ...args] = raw.trim().split(/\s+/)
+    const arg = args.join(" ")
+    const say = (text: string, kind: Line["kind"] = "out") => out.push({ kind, text })
+    const out: Line[] = [{ kind: "in", text: `${prompt} ${raw}` }]
+    const dir = here()
+
+    switch (cmd.toLowerCase()) {
+      case "":
+        break
+      case "help":
+        say("ls [-a]          list files (-a shows hidden ones)\ncd <folder>      open a folder (cd .. goes back)\ncat <file>       read a file\nunlock <word>    unlock contact.txt\nflag <flag>      submit a flag you found on this site\nwhoami, pwd, clear")
+        break
+      case "ls": {
+        const names = Object.keys(dir).filter((n) => args.includes("-a") || !n.startsWith("."))
+        say(names.map((n) => (typeof dir[n] === "string" ? n : n + "/")).join("   "))
+        break
+      }
+      case "cd":
+        if (!arg || arg === "~" || arg === "/") setCwd([])
+        else if (arg === "..") setCwd((c) => c.slice(0, -1))
+        else if (typeof dir[arg.replace(/\/$/, "")] === "object") setCwd((c) => [...c, arg.replace(/\/$/, "")])
+        else say(`cd: ${arg}: no such folder`, "err")
+        break
+      case "cat":
+        if (!arg) say("cat: which file? Try ls first.", "err")
+        else if (cwd.length === 0 && arg === "contact.txt") {
+          if (unlocked) say(`Email     ${links.email}\nLinkedIn  ${links.linkedinLabel}\nGitHub    github.com/NunoGoncalves06\n\nYou got in. Write to me, I'd like to hear how long it took.`, "ok")
+          else say("cat: contact.txt: permission denied. Try unlock <passphrase>.", "err")
+        } else if (typeof dir[arg] === "string") say(dir[arg] as string)
+        else if (dir[arg]) say(`cat: ${arg}: is a folder. Use cd ${arg}`, "err")
+        else say(`cat: ${arg}: no such file`, "err")
+        break
+      case "unlock":
+        if (PASSPHRASES.includes(arg.toLowerCase())) {
+          setUnlocked(true)
+          say("contact.txt unlocked. Now read it.", "ok")
+        } else say("Wrong passphrase. Maybe someone left a note. Hidden files start with a dot.", "err")
+        break
+      case "flag": {
+        const result = addFlag(arg)
+        say(
+          result === "new" ? "Correct. That flag counts; see the footer." : result === "again" ? "You already found that one." : "That's not one of the flags.",
+          result === "wrong" ? "err" : "ok",
+        )
+        break
+      }
+      case "whoami":
+        say("a visitor. The machine belongs to Nuno.")
+        break
+      case "pwd":
+        say("/home/nuno" + (cwd.length ? "/" + cwd.join("/") : ""))
+        break
+      case "sudo":
+        say("Nice try. This incident will be reported.", "err")
+        break
+      case "clear":
+        setLines([])
+        return
+      default:
+        say(`${cmd}: command not found. Type help.`, "err")
+    }
+    setLines((l) => [...l, ...out].slice(-60))
   }
 
   return (
-    <div className="min-w-0 rounded-sm border border-line bg-panel font-mono text-[12px] sm:text-[13px] shadow-[0_0_0_1px_rgb(255_42_79/0.06)]">
-      <div className="flex items-center justify-between border-b border-line px-4 py-2 text-xs text-faint">
-        <span>check_password, disassembled</span>
-        <span>{patched ? "1 byte patched" : "original"}</span>
+    <div
+      className="flex h-[26rem] min-w-0 flex-col rounded-sm border border-line bg-panel font-mono text-[12px] sm:text-[13px]"
+      onClick={() => field.current?.focus()}
+    >
+      <div className="flex items-center gap-2 border-b border-line px-4 py-2 text-xs text-faint">
+        <span className="size-2.5 rounded-full bg-[#ff5f56]" />
+        <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
+        <span className="size-2.5 rounded-full bg-[#27c93f]" />
+        <span className="ml-2">nuno@kali: escape room</span>
+        <span className="ml-auto">{unlocked ? "contact.txt unlocked" : "goal: read contact.txt"}</span>
       </div>
-      <ol className="space-y-1 px-4 py-4">
-        {LISTING.map(([addr, raw, op, args, note]) => {
-          const isBranch = addr === "00401150"
-          return (
-            <li
-              key={addr}
-              className={`grid grid-cols-[4.75rem_2.5rem_1fr] gap-2 rounded-sm px-1 sm:grid-cols-[5.5rem_7.5rem_3rem_1fr] ${isBranch ? "bg-amber/10" : ""}`}
-            >
-              <span className="text-faint">{addr}</span>
-              <span className="hidden text-faint/70 sm:block">{isBranch && patched ? "74 07" : raw}</span>
-              <span className={isBranch ? "text-amber" : "text-red"}>{isBranch && patched ? "je" : op}</span>
-              <span className="truncate text-ink">
-                {args} <span className="text-faint">{isBranch && patched ? "; if same: deny" : note}</span>
-              </span>
-            </li>
-          )
-        })}
-      </ol>
-      <div className="border-t border-line px-4 py-4">
-        <label htmlFor="guess" className="block text-xs text-body">
-          Try a password
+      <div ref={screen} className="min-h-0 flex-1 overflow-y-auto px-4 py-3" aria-live="polite">
+        {lines.map((l, i) => (
+          <pre
+            key={i}
+            className={`whitespace-pre-wrap break-words ${l.kind === "in" ? "text-ink" : l.kind === "ok" ? "text-amber" : l.kind === "err" ? "text-red" : "text-body"}`}
+          >
+            {l.text}
+          </pre>
+        ))}
+      </div>
+      <form
+        className="flex items-center gap-2 border-t border-line px-4 py-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (input.trim()) setHistory((h) => [...h, input])
+          setBack(0)
+          run(input)
+          setInput("")
+        }}
+      >
+        <label htmlFor="shell" className="shrink-0 text-red">
+          {prompt}
         </label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <input
-            id="guess"
-            value={guess}
-            onChange={(e) => setGuess(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && run()}
-            className="min-w-0 flex-1 basis-40 rounded-sm border border-input bg-background px-3 py-2 text-ink placeholder:text-faint"
-            spellCheck={false}
-            autoComplete="off"
-          />
-          <Button onClick={run}>Run</Button>
-          <Button variant="outline" onClick={() => setPatched((p) => !p)}>
-            {patched ? "Undo patch" : "Patch the jump"}
-          </Button>
-        </div>
-        <ul className="mt-3 min-h-[4.5rem] space-y-1 text-xs" aria-live="polite">
-          {runs.length === 0 && <li className="text-faint">Run it, then patch the jump and run the same wrong password again.</li>}
-          {runs.map((r, i) => (
-            <li key={i} className={r.ok ? "text-amber" : "text-faint"}>
-              $ ./login {r.guess || "''"} <span className="text-faint">{r.patched ? "(patched)" : ""}</span> {r.ok ? "access granted" : "access denied"}
-            </li>
-          ))}
-        </ul>
-      </div>
+        <input
+          id="shell"
+          ref={field}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return
+            e.preventDefault()
+            const next = Math.min(history.length, Math.max(0, back + (e.key === "ArrowUp" ? 1 : -1)))
+            setBack(next)
+            setInput(next ? history[history.length - next] : "")
+          }}
+          className="min-w-0 flex-1 bg-transparent text-ink caret-red outline-none"
+          spellCheck={false}
+          autoComplete="off"
+          autoCapitalize="off"
+          aria-label="Terminal command"
+        />
+      </form>
     </div>
   )
+}
+
+// The easter egg hunt: three flags hidden around the site (page source, browser console,
+// hovering the dragon). Visitors submit them in the terminal; the footer keeps score.
+const FLAGS = ["flag{view_source}", "flag{console_curious}", "flag{here_be_dragons}"]
+
+function useFlags() {
+  const [found, setFound] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("flags-found") ?? "[]")
+    } catch {
+      return []
+    }
+  })
+  const add = (raw: string): "new" | "again" | "wrong" => {
+    const flag = raw.trim().toLowerCase()
+    if (!FLAGS.includes(flag)) return "wrong"
+    if (found.includes(flag)) return "again"
+    const next = [...found, flag]
+    setFound(next)
+    try {
+      localStorage.setItem("flags-found", JSON.stringify(next))
+    } catch {
+      /* private mode: the score just won't survive a reload */
+    }
+    return "new"
+  }
+  return { found, add }
 }
 
 function Results() {
