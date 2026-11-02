@@ -159,7 +159,7 @@ export const projects: Project[] = [
 ]
 
 export const toolbox = [
-  { area: "Security", items: ["Kali Linux", "Nmap", "Wireshark", "Burp Suite", "Hydra", "Ghidra"] },
+  { area: "Security", items: ["Kali Linux", "Nmap", "Wireshark", "Burp Suite", "Hydra", "Ghidra", "Hashcat"] },
   { area: "Networks", items: ["Cisco IOS", "VLANs and STP", "OSPF", "NAT and ACLs", "IPsec VPN", "Ansible"] },
   { area: "Code", items: ["Java", "C", "Python", "Kotlin", "C++", "C#"] },
   { area: "Platforms", items: ["Linux", "Docker", "Git and GitLab", "Android", "AWS fundamentals"] },
