@@ -35,6 +35,8 @@ export const results: Result[] = [
 // The three lines in the hero card.
 export const highlights = [
   { title: "CCNA certified", detail: "Cisco, August 2026" },
+  { title: "CEH v13 training completed", detail: "ISEP Academy, July 2026" },
+  { title: "AWS Cloud Practitioner training completed", detail: "ISEP Academy, January 2026" },
   { title: "8th of 300+ teams", detail: "upCTF 2026, my first CTF" },
   { title: "Junior top 10", detail: "National bootcamp, National Cybersecurity Centre, 2026" },
 ]

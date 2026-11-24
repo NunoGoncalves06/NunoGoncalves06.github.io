@@ -96,8 +96,8 @@ function Hero() {
         </div>
 
         <aside aria-label="Highlights" className="rounded-sm border border-line bg-panel p-6 md:p-8">
-          <img src="nuno.webp" alt="Nuno Gonçalves" width={72} height={72} fetchPriority="high" className="size-[72px] rounded-full object-cover" />
-          <ul className="mt-6 divide-y divide-line">
+          <img src="nuno.webp" alt="Nuno Gonçalves" width={114} height={114} fetchPriority="high" className="float-left mb-2 mr-6 size-[114px] rounded-full object-cover" />
+          <ul className="divide-y divide-line text-right">
             {highlights.map((h) => (
               <li key={h.title} className="py-3 first:pt-0 last:pb-0">
                 <p className="font-semibold text-ink">{h.title}</p>
